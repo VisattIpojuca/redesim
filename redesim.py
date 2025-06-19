@@ -7,7 +7,7 @@ import io
 st.set_page_config(page_title="Painel VISA Ipojuca", layout="wide")
 st.title("Painel de Inspeções - Vigilância Sanitária de Ipojuca")
 
-# 🔗 Função para carregar dados da planilha Google
+# 🔗 Carregar dados da planilha Google
 @st.cache_data
 def carregar_dados():
     url = "https://docs.google.com/spreadsheets/d/1nKoAEXQ0QZOrIt-0CMvW5MOt9Q_FC8Ak/export?format=csv"
@@ -41,7 +41,6 @@ filtro_classificacao = st.sidebar.multiselect('CLASSIFICAÇÃO', df['CLASSIFICA�
 filtro_territorio = st.sidebar.multiselect('TERRITÓRIO', df['TERRITÓRIO'].dropna().unique())
 filtro_situacao = st.sidebar.multiselect('SITUAÇÃO', df['SITUAÇÃO'].dropna().unique())
 
-# Filtro de data
 data_hoje = datetime.today()
 data_inicio, data_fim = st.sidebar.date_input('Período de ENTRADA', [data_hoje, data_hoje])
 
@@ -112,17 +111,17 @@ if filtro_classificacao and data_inicio and data_fim:
 
             perc_visita = dentro_prazo_visita / total * 100
 
-            dados_concluidos = dados[~dados['SITUAÇÃO'].isin([None, '', 'INDEFERIDO'])]
+            dados_concluidos = dados[dados['SITUAÇÃO'].isin(['APROVADO', 'LICENÇA LIBERADA'])]
             total_concluidos = len(dados_concluidos)
 
-            if classificacao != 'BAIXO RISCO':
+            if classificacao != 'BAIXO RISCO' and total_concluidos > 0:
                 dentro_prazo_conclusao = dados_concluidos.apply(
                     lambda row: (pd.notnull(row['DATA_CONCLUSAO']) and row['DATA_CONCLUSAO'] <= row['ENTRADA'] + timedelta(days=90)) or
                                 (pd.isnull(row['DATA_CONCLUSAO']) and datetime.now() <= row['ENTRADA'] + timedelta(days=90)),
                     axis=1
                 ).sum()
 
-                perc_conclusao = dentro_prazo_conclusao / total_concluidos * 100 if total_concluidos > 0 else 0
+                perc_conclusao = dentro_prazo_conclusao / total_concluidos * 100
 
                 st.markdown(f"""
                 ### {classificacao}
@@ -159,7 +158,7 @@ st.plotly_chart(g1, use_container_width=True)
 g2 = px.histogram(df_filtrado, x='CLASSIFICAÇÃO', title='Distribuição por Classificação')
 st.plotly_chart(g2, use_container_width=True)
 
-# 🔸 Tabela de Dados
+# 🔸 Tabela
 st.subheader('Tabela de Dados Filtrados')
 st.dataframe(df_filtrado)
 
@@ -178,13 +177,12 @@ with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df_explicacao = pd.DataFrame({
             'Descrição': [
                 'Inspecionados no Prazo: Nº de inspeções realizadas até 30 dias após ENTRADA ÷ Total de processos',
-                'Licenciados no Prazo: Nº de licenças concluídas até 90 dias após ENTRADA ÷ Total de processos válidos (exceto indeferidos)',
+                'Licenciados no Prazo: Nº de licenças concluídas até 90 dias após ENTRADA ÷ Total de processos válidos (situação "APROVADO" ou "LICENÇA LIBERADA")',
+                'Processos com situação "INDEFERIDO" ou em aberto NÃO são considerados no cálculo de conclusão',
                 'Metas: Alto Risco ≥ 80%, Médio Risco ≥ 100%, Baixo Risco ≥ 50% (apenas para inspeções)'
             ]
         })
         df_explicacao.to_excel(writer, sheet_name='Como é Calculado', index=False)
-
-# ✅ writer.save() foi removido! Não é necessário.
 
 st.download_button(
     label="📥 Baixar Relatório Excel",
