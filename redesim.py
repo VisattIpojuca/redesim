@@ -9,11 +9,11 @@ from datetime import datetime, timedelta
 st.set_page_config(page_title="Painel VISA Ipojuca", layout="wide")
 st.title("Painel de Inspeções - Vigilância Sanitária de Ipojuca")
 
-# Função para carregar dados
+# Função para carregar dados do Google Sheets
 @st.cache_data
 def carregar_dados():
-    url = 'https://onedrive.live.com/download?resid=A02D1C8401EF2135!328&authkey=!AICiDnVtSvF-RSk&em=2'
-    df = pd.read_excel(url)
+    url = 'https://docs.google.com/spreadsheets/d/1nKoAEXQ0QZOrIt-0CMvW5MOt9Q_FC8Ak/export?format=csv'
+    df = pd.read_csv(url)
     return df
 
 df = carregar_dados()
@@ -24,7 +24,7 @@ df['1ª_INSPEÇÃO'] = pd.to_datetime(df['1ª INSPEÇÃO'], errors='coerce')
 df['CONCLUSÃO'] = pd.to_datetime(df['CONCLUSÃO'], errors='coerce')
 df['PREVISÃO_CONCLUSÃO'] = pd.to_datetime(df['PREVISÃO CONCLUSÃO'], errors='coerce')
 
-# Barra lateral - Filtros
+# Filtros na barra lateral
 st.sidebar.header('Filtros')
 
 filtro_protocolo = st.sidebar.multiselect('PROTOCOLO', df['PROTOCOLO'].dropna().unique())
@@ -58,30 +58,22 @@ if filtro_situacao:
 if data_inicio and data_fim:
     df_filtrado = df_filtrado[(df_filtrado['ENTRADA'] >= pd.to_datetime(data_inicio)) & (df_filtrado['ENTRADA'] <= pd.to_datetime(data_fim))]
 
-# Caixa de Resumo da Seleção
+# Resumo da Seleção
 if len(filtro_protocolo) == 1:
     resumo = df_filtrado[df_filtrado['PROTOCOLO'] == filtro_protocolo[0]].iloc[0]
     st.sidebar.subheader('Resumo da Seleção')
     st.sidebar.markdown(f"""
     **Estabelecimento:** {resumo.get('ESTABELECIMENTO', '')}
-
     **Protocolo:** {resumo.get('PROTOCOLO', '')}
-
     **Atividade:** {resumo.get('ATIVIDADE', '')}
-
-    **Classificação:** {resumo.get('CLASSIFICAÇÃO', '')}
-
+    **Classificação:** {resumo.get('CLASSIFICAçÃO', '')}
     **Território:** {resumo.get('TERRITÓRIO', '')}
-
     **Situação:** {resumo.get('SITUAÇÃO', '')}
-
     **Justificativa:** {resumo.get('JUSTIFICATIVA', '')}
     """)
 
-# Cálculo de Indicadores
+# Indicadores de Desempenho
 st.subheader('Indicadores de Desempenho')
-
-indicadores = ""
 
 if filtro_classificacao and data_inicio and data_fim:
     for classificacao in filtro_classificacao:
@@ -90,12 +82,10 @@ if filtro_classificacao and data_inicio and data_fim:
         if not dados.empty:
             total = len(dados)
 
-            # Prazo 1ª Inspeção - 30 dias
             dentro_prazo_visita = dados.apply(lambda row: (pd.notnull(row['1ª_INSPEÇÃO']) and (row['1ª_INSPEÇÃO'] <= row['ENTRADA'] + timedelta(days=30))) or (pd.isnull(row['1ª_INSPEÇÃO']) and (datetime.now() <= row['ENTRADA'] + timedelta(days=30))), axis=1).sum()
 
             perc_visita = dentro_prazo_visita / total * 100 if total > 0 else 0
 
-            # Prazo Licenciamento - 90 dias
             dentro_prazo_conclusao = dados.apply(lambda row: (pd.notnull(row['CONCLUSÃO']) and (row['CONCLUSÃO'] <= row['ENTRADA'] + timedelta(days=90))) or (pd.isnull(row['CONCLUSÃO']) and (datetime.now() <= row['ENTRADA'] + timedelta(days=90))), axis=1).sum()
 
             perc_conclusao = dentro_prazo_conclusao / total * 100 if total > 0 else 0
