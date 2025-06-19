@@ -7,7 +7,7 @@ import io
 st.set_page_config(page_title="Painel VISA Ipojuca", layout="wide")
 st.title("Painel de Inspeções - Vigilância Sanitária de Ipojuca")
 
-# Função para carregar os dados da planilha Google
+# 🔗 Função para carregar dados da planilha Google
 @st.cache_data
 def carregar_dados():
     url = "https://docs.google.com/spreadsheets/d/1nKoAEXQ0QZOrIt-0CMvW5MOt9Q_FC8Ak/export?format=csv"
@@ -20,7 +20,7 @@ def carregar_dados():
         'DATA CONCLUSÃO': 'DATA_CONCLUSAO'
     }, inplace=True)
 
-    # Converter colunas de data
+    # Conversão de datas
     df['ENTRADA'] = pd.to_datetime(df['ENTRADA'], errors='coerce')
     df['1ª INSPEÇÃO'] = pd.to_datetime(df['1ª INSPEÇÃO'], errors='coerce')
     df['DATA_CONCLUSAO'] = pd.to_datetime(df['DATA_CONCLUSAO'], errors='coerce')
@@ -30,7 +30,7 @@ def carregar_dados():
 
 df = carregar_dados()
 
-# Filtros
+# 🔍 Filtros
 st.sidebar.header('Filtros')
 
 filtro_protocolo = st.sidebar.multiselect('PROTOCOLO', df['PROTOCOLO'].dropna().unique())
@@ -41,6 +41,7 @@ filtro_classificacao = st.sidebar.multiselect('CLASSIFICAÇÃO', df['CLASSIFICA�
 filtro_territorio = st.sidebar.multiselect('TERRITÓRIO', df['TERRITÓRIO'].dropna().unique())
 filtro_situacao = st.sidebar.multiselect('SITUAÇÃO', df['SITUAÇÃO'].dropna().unique())
 
+# Filtro de data
 data_hoje = datetime.today()
 data_inicio, data_fim = st.sidebar.date_input('Período de ENTRADA', [data_hoje, data_hoje])
 
@@ -67,7 +68,7 @@ if data_inicio and data_fim:
         (df_filtrado['ENTRADA'] <= pd.to_datetime(data_fim))
     ]
 
-# Resumo da seleção
+# 🔸 Resumo da seleção
 if len(filtro_protocolo) == 1:
     resumo = df_filtrado[df_filtrado['PROTOCOLO'] == filtro_protocolo[0]]
     if not resumo.empty:
@@ -83,7 +84,7 @@ if len(filtro_protocolo) == 1:
         **Justificativa:** {r.get('JUSTIFICATIVA', '')}  
         """)
 
-# Indicadores
+# 🔸 Indicadores
 st.subheader('Indicadores de Desempenho')
 
 resumo_indicadores = []
@@ -151,19 +152,19 @@ if filtro_classificacao and data_inicio and data_fim:
                     'Resultado Licença (%)': ''
                 })
 
-# Gráficos
+# 🔸 Gráficos
 g1 = px.bar(df_filtrado, x='TERRITÓRIO', color='CLASSIFICAÇÃO', title='Distribuição de Inspeções por Território')
 st.plotly_chart(g1, use_container_width=True)
 
 g2 = px.histogram(df_filtrado, x='CLASSIFICAÇÃO', title='Distribuição por Classificação')
 st.plotly_chart(g2, use_container_width=True)
 
-# Tabela
+# 🔸 Tabela de Dados
 st.subheader('Tabela de Dados Filtrados')
 st.dataframe(df_filtrado)
 
-# 🔥 Geração de relatório em Excel
-st.subheader('📥 Download do Relatório')
+# 🔥 Download do Relatório Excel
+st.subheader('📥 Download do Relatório Excel')
 
 output = io.BytesIO()
 
@@ -183,7 +184,7 @@ with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         })
         df_explicacao.to_excel(writer, sheet_name='Como é Calculado', index=False)
 
-    writer.save()
+# ✅ writer.save() foi removido! Não é necessário.
 
 st.download_button(
     label="📥 Baixar Relatório Excel",
