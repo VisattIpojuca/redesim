@@ -41,8 +41,16 @@ filtro_classificacao = st.sidebar.multiselect('CLASSIFICAÇÃO', df['CLASSIFICA�
 filtro_territorio = st.sidebar.multiselect('TERRITÓRIO', df['TERRITÓRIO'].dropna().unique())
 filtro_situacao = st.sidebar.multiselect('SITUAÇÃO', df['SITUAÇÃO'].dropna().unique())
 
-data_hoje = datetime.today()
-data_inicio, data_fim = st.sidebar.date_input('Período de ENTRADA', [data_hoje, data_hoje])
+# Filtro de datas dinâmico
+data_min = df['ENTRADA'].min()
+data_max = df['ENTRADA'].max()
+
+data_inicio, data_fim = st.sidebar.date_input(
+    'Período de ENTRADA',
+    [data_min, data_max],
+    min_value=data_min,
+    max_value=data_max
+)
 
 # Aplicação dos filtros
 df_filtrado = df.copy()
@@ -61,11 +69,12 @@ if filtro_territorio:
     df_filtrado = df_filtrado[df_filtrado['TERRITÓRIO'].isin(filtro_territorio)]
 if filtro_situacao:
     df_filtrado = df_filtrado[df_filtrado['SITUAÇÃO'].isin(filtro_situacao)]
-if data_inicio and data_fim:
-    df_filtrado = df_filtrado[
-        (df_filtrado['ENTRADA'] >= pd.to_datetime(data_inicio)) &
-        (df_filtrado['ENTRADA'] <= pd.to_datetime(data_fim))
-    ]
+
+# Filtro de datas
+df_filtrado = df_filtrado[
+    (df_filtrado['ENTRADA'] >= pd.to_datetime(data_inicio)) &
+    (df_filtrado['ENTRADA'] <= pd.to_datetime(data_fim))
+]
 
 # 🔸 Resumo da seleção
 if len(filtro_protocolo) == 1:
@@ -88,7 +97,7 @@ st.subheader('Indicadores de Desempenho')
 
 resumo_indicadores = []
 
-if filtro_classificacao and data_inicio and data_fim:
+if filtro_classificacao:
     for classificacao in filtro_classificacao:
         dados = df_filtrado[df_filtrado['CLASSIFICAÇÃO'] == classificacao]
         dados = dados.copy()
