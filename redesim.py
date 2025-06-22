@@ -6,7 +6,7 @@ import io
 
 # Configuração da página
 st.set_page_config(page_title="Painel VISA Ipojuca", layout="wide")
-st.title("Painel de Inspeções - Vigilância Sanitária de Ipojuca")
+st.title("Painel de Indicadores REDESIM - Vigilância Sanitária de Ipojuca")
 
 # 🔗 Função para carregar dados da planilha Google
 @st.cache_data
