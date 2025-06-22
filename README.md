@@ -1,8 +1,6 @@
 # Painel de Inspeções - Vigilância Sanitária de Ipojuca
 
-Este é um painel desenvolvido para a Vigilância Sanitária de Ipojuca, com o objetivo de monitorar os processos de inspeções, emissão de licenças e acompanhamento dos prazos.
-
-## 🚀 Funcionalidades
+## 🔍 Funcionalidades
 
 - Filtros dinâmicos por:
   - Protocolo
@@ -11,38 +9,35 @@ Este é um painel desenvolvido para a Vigilância Sanitária de Ipojuca, com o o
   - Atividade
   - Classificação
   - Território
-  - Situação
-  - Entrada (com seletor de datas)
+  - Situação (ordenado alfabeticamente)
+  - Entrada (seletor de datas)
 
-- Resumo da seleção quando selecionado um único protocolo.
+- Resumo da seleção quando escolhido um único protocolo.
 
-- Cálculo de dois indicadores principais:
-  - **1ª Visita em até 30 dias**  
-    (Avalia se a primeira inspeção foi realizada até a data prevista — Coluna "PREV 1ª INSP".)
+- Indicadores de Desempenho:
+  - **🕒 1ª Visita em até 30 dias**
+    - Considera processos cuja 1ª inspeção ocorreu até a data prevista.
+    - Exclui situações: "AGUARDANDO 1ª INSPEÇÃO" e "PENDÊNCIA DOCUMENTAL".
+  - **📜 Processo finalizado em até 90 dias**
+    - Considera processos concluídos até a previsão de conclusão.
+    - Exclui situações: "EM INSPEÇÃO", "AGUARDANDO 1ª INSPEÇÃO" e "PENDÊNCIA DOCUMENTAL".
 
-  - **Processo finalizado em até 90 dias**  
-    (Avalia se o processo foi concluído até a data prevista — Coluna "PREVISÃO CONCLUSÃO".)
+- Gráfico das justificativas dos **INDEFERIDOS**.
 
-- Gráfico das justificativas dos processos **indeferidos**.
+- Visualização de:
+  - Dados filtrados
+  - Gráficos interativos
 
-- Visualização de gráficos interativos:
-  - Distribuição por território
-  - Distribuição por classificação
-
-- Tabela de dados filtrados.
-
-- Exportação de relatório Excel com três abas:
+- Download de relatório Excel com:
   - Dados Filtrados
   - Resumo dos Indicadores
   - Justificativas dos Indeferidos
 
 ---
 
-## 🛠️ Como Executar
+## 🚀 Como Executar
 
 1. Clone este repositório.
-
-2. Instale as dependências com:
-
+2. Instale as dependências:
 ```bash
 pip install -r requirements.txt

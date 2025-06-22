@@ -4,10 +4,11 @@ import plotly.express as px
 from datetime import datetime
 import io
 
+# Configuração da página
 st.set_page_config(page_title="Painel VISA Ipojuca", layout="wide")
 st.title("Painel de Inspeções - Vigilância Sanitária de Ipojuca")
 
-# 🔗 Carregar dados da planilha Google
+# 🔗 Função para carregar dados da planilha Google
 @st.cache_data
 def carregar_dados():
     url = "https://docs.google.com/spreadsheets/d/1nKoAEXQ0QZOrIt-0CMvW5MOt9Q_FC8Ak/export?format=csv"
@@ -31,7 +32,7 @@ def carregar_dados():
 
 df = carregar_dados()
 
-# 🔍 Filtros
+# 🔍 Filtros na barra lateral
 st.sidebar.header('Filtros')
 
 filtro_protocolo = st.sidebar.multiselect('PROTOCOLO', sorted(df['PROTOCOLO'].dropna().unique()))
@@ -42,7 +43,6 @@ filtro_classificacao = st.sidebar.multiselect('CLASSIFICAÇÃO', sorted(df['CLAS
 filtro_territorio = st.sidebar.multiselect('TERRITÓRIO', sorted(df['TERRITÓRIO'].dropna().unique()))
 filtro_situacao = st.sidebar.multiselect('SITUAÇÃO', sorted(df['SITUAÇÃO'].dropna().unique()))
 
-# Filtro de datas
 data_min = df['ENTRADA'].min()
 data_max = df['ENTRADA'].max()
 
@@ -53,7 +53,7 @@ data_inicio, data_fim = st.sidebar.date_input(
     max_value=data_max
 )
 
-# Aplicar filtros
+# 🔧 Aplicar filtros
 df_filtrado = df.copy()
 
 if filtro_protocolo:
@@ -92,18 +92,15 @@ if len(filtro_protocolo) == 1:
         **Justificativa:** {r.get('JUSTIFICATIVA', '')}  
         """)
 
-# 🔸 Indicadores Atualizados
-st.subheader('Indicadores de Desempenho')
+# 🔥 Indicador 1 – 1ª Visita em até 30 dias
+df_30 = df_filtrado[~df_filtrado['SITUAÇÃO'].isin(["AGUARDANDO 1ª INSPEÇÃO", "PENDÊNCIA DOCUMENTAL"])]
 
-## Indicador 1: 1ª Visita em até 30 dias
-situacoes_excluir_30 = ["INDEFERIDO", "AGUARDANDO 1ª INSPEÇÃO", "APROVADO", "PENDÊNCIA DOCUMENTAL"]
-df_30 = df_filtrado[~df_filtrado['SITUAÇÃO'].isin(situacoes_excluir_30)]
+filtro_valido_30 = (
+    (pd.notnull(df_30['1ª INSPEÇÃO'])) &
+    (df_30['1ª INSPEÇÃO'] <= df_30['PREVISAO_1A_INSP'])
+)
 
-numerador_30 = df_30.apply(
-    lambda row: pd.notnull(row['1ª INSPEÇÃO']) and row['1ª INSPEÇÃO'] <= row['PREVISAO_1A_INSP'],
-    axis=1
-).sum()
-
+numerador_30 = filtro_valido_30.sum()
 denominador_30 = len(df_filtrado)
 
 percentual_30 = (numerador_30 / denominador_30 * 100) if denominador_30 > 0 else 0
@@ -115,15 +112,15 @@ st.markdown(f"""
 - 📊 **Denominador:** {denominador_30}
 """)
 
-## Indicador 2: Processo finalizado em até 90 dias
-situacoes_excluir_90 = ["EM INSPEÇÃO", "AGUARDANDO 1ª INSPEÇÃO", "PENDÊNCIA DOCUMENTAL"]
-df_90 = df_filtrado[~df_filtrado['SITUAÇÃO'].isin(situacoes_excluir_90)]
+# 🔥 Indicador 2 – Processo finalizado em até 90 dias
+df_90 = df_filtrado[~df_filtrado['SITUAÇÃO'].isin(["EM INSPEÇÃO", "AGUARDANDO 1ª INSPEÇÃO", "PENDÊNCIA DOCUMENTAL"])]
 
-numerador_90 = df_90.apply(
-    lambda row: pd.notnull(row['DATA_CONCLUSAO']) and row['DATA_CONCLUSAO'] <= row['PREVISÃO CONCLUSÃO'],
-    axis=1
-).sum()
+filtro_valido_90 = (
+    (pd.notnull(df_90['DATA_CONCLUSAO'])) &
+    (df_90['DATA_CONCLUSAO'] <= df_90['PREVISÃO CONCLUSÃO'])
+)
 
+numerador_90 = filtro_valido_90.sum()
 denominador_90 = len(df_filtrado)
 
 percentual_90 = (numerador_90 / denominador_90 * 100) if denominador_90 > 0 else 0
@@ -135,7 +132,7 @@ st.markdown(f"""
 - 📊 **Denominador:** {denominador_90}
 """)
 
-# 🔥 Gráfico de Justificativas dos Indeferidos
+# 📊 Gráfico de Justificativas dos Indeferidos
 st.subheader('Justificativas dos Indeferidos')
 
 df_indeferido = df_filtrado[df_filtrado['SITUAÇÃO'] == "INDEFERIDO"]
@@ -152,18 +149,18 @@ if not df_indeferido.empty:
 else:
     st.info("Não há registros com situação 'INDEFERIDO' no filtro atual.")
 
-# 🔸 Gráficos Gerais
+# 📈 Gráficos gerais
 g1 = px.bar(df_filtrado, x='TERRITÓRIO', color='CLASSIFICAÇÃO', title='Distribuição de Inspeções por Território')
 st.plotly_chart(g1, use_container_width=True)
 
 g2 = px.histogram(df_filtrado, x='CLASSIFICAÇÃO', title='Distribuição por Classificação')
 st.plotly_chart(g2, use_container_width=True)
 
-# 🔸 Tabela
+# 🗂️ Tabela de dados
 st.subheader('Tabela de Dados Filtrados')
 st.dataframe(df_filtrado)
 
-# 🔥 Download do Relatório Excel
+# 💾 Download do Relatório Excel
 st.subheader('📥 Download do Relatório Excel')
 
 output = io.BytesIO()
