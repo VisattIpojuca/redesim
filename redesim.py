@@ -1,47 +1,44 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from datetime import datetime, timedelta
+from datetime import datetime
 import io
 
 st.set_page_config(page_title="Painel VISA Ipojuca", layout="wide")
 st.title("Painel de Inspeções - Vigilância Sanitária de Ipojuca")
 
-# 🔗 Carregar dados da planilha Google
 @st.cache_data
 def carregar_dados():
     url = "https://docs.google.com/spreadsheets/d/1nKoAEXQ0QZOrIt-0CMvW5MOt9Q_FC8Ak/export?format=csv"
     df = pd.read_csv(url)
 
-    # Renomear colunas
     df.rename(columns={
         'NOME': 'ESTABELECIMENTO',
         'CONCLUSÃO': 'SITUAÇÃO',
         'DATA CONCLUSÃO': 'DATA_CONCLUSAO'
     }, inplace=True)
 
-    # Conversão de datas
     df['ENTRADA'] = pd.to_datetime(df['ENTRADA'], errors='coerce')
     df['1ª INSPEÇÃO'] = pd.to_datetime(df['1ª INSPEÇÃO'], errors='coerce')
     df['DATA_CONCLUSAO'] = pd.to_datetime(df['DATA_CONCLUSAO'], errors='coerce')
     df['PREVISÃO CONCLUSÃO'] = pd.to_datetime(df['PREVISÃO CONCLUSÃO'], errors='coerce')
+    df['PREVISAO_1A_INSP'] = pd.to_datetime(df['PREVISÃO 1ª INSPEÇÃO'], errors='coerce')
 
     return df
 
 df = carregar_dados()
 
-# 🔍 Filtros
+# Filtros
 st.sidebar.header('Filtros')
 
-filtro_protocolo = st.sidebar.multiselect('PROTOCOLO', df['PROTOCOLO'].dropna().unique())
-filtro_cnpj = st.sidebar.multiselect('CNPJ', df['CNPJ'].dropna().unique())
-filtro_estab = st.sidebar.multiselect('ESTABELECIMENTO', df['ESTABELECIMENTO'].dropna().unique())
-filtro_atividade = st.sidebar.multiselect('ATIVIDADE', df['ATIVIDADE'].dropna().unique())
-filtro_classificacao = st.sidebar.multiselect('CLASSIFICAÇÃO', df['CLASSIFICAÇÃO'].dropna().unique())
-filtro_territorio = st.sidebar.multiselect('TERRITÓRIO', df['TERRITÓRIO'].dropna().unique())
-filtro_situacao = st.sidebar.multiselect('SITUAÇÃO', df['SITUAÇÃO'].dropna().unique())
+filtro_protocolo = st.sidebar.multiselect('PROTOCOLO', sorted(df['PROTOCOLO'].dropna().unique()))
+filtro_cnpj = st.sidebar.multiselect('CNPJ', sorted(df['CNPJ'].dropna().unique()))
+filtro_estab = st.sidebar.multiselect('ESTABELECIMENTO', sorted(df['ESTABELECIMENTO'].dropna().unique()))
+filtro_atividade = st.sidebar.multiselect('ATIVIDADE', sorted(df['ATIVIDADE'].dropna().unique()))
+filtro_classificacao = st.sidebar.multiselect('CLASSIFICAÇÃO', sorted(df['CLASSIFICAÇÃO'].dropna().unique()))
+filtro_territorio = st.sidebar.multiselect('TERRITÓRIO', sorted(df['TERRITÓRIO'].dropna().unique()))
+filtro_situacao = st.sidebar.multiselect('SITUAÇÃO', sorted(df['SITUAÇÃO'].dropna().unique()))
 
-# Filtro de datas dinâmico
 data_min = df['ENTRADA'].min()
 data_max = df['ENTRADA'].max()
 
@@ -52,7 +49,6 @@ data_inicio, data_fim = st.sidebar.date_input(
     max_value=data_max
 )
 
-# Aplicação dos filtros
 df_filtrado = df.copy()
 
 if filtro_protocolo:
@@ -70,13 +66,11 @@ if filtro_territorio:
 if filtro_situacao:
     df_filtrado = df_filtrado[df_filtrado['SITUAÇÃO'].isin(filtro_situacao)]
 
-# Filtro de datas
 df_filtrado = df_filtrado[
     (df_filtrado['ENTRADA'] >= pd.to_datetime(data_inicio)) &
     (df_filtrado['ENTRADA'] <= pd.to_datetime(data_fim))
 ]
 
-# 🔸 Resumo da seleção
 if len(filtro_protocolo) == 1:
     resumo = df_filtrado[df_filtrado['PROTOCOLO'] == filtro_protocolo[0]]
     if not resumo.empty:
@@ -92,106 +86,92 @@ if len(filtro_protocolo) == 1:
         **Justificativa:** {r.get('JUSTIFICATIVA', '')}  
         """)
 
-# 🔸 Indicadores
+# Indicador: 1ª Visita em até 30 dias
 st.subheader('Indicadores de Desempenho')
 
-resumo_indicadores = []
+situacoes_excluir_30 = ["INDEFERIDO", "AGUARDANDO 1ª INSPEÇÃO", "APROVADO", "PENDÊNCIA DOCUMENTAL"]
+df_30 = df_filtrado[~df_filtrado['SITUAÇÃO'].isin(situacoes_excluir_30)]
 
-if filtro_classificacao:
-    for classificacao in filtro_classificacao:
-        dados = df_filtrado[df_filtrado['CLASSIFICAÇÃO'] == classificacao]
-        dados = dados.copy()
+numerador_30 = df_30.apply(
+    lambda row: pd.notnull(row['1ª INSPEÇÃO']) and row['1ª INSPEÇÃO'] <= row['PREVISAO_1A_INSP'],
+    axis=1
+).sum()
 
-        if classificacao in ['ALTO RISCO', 'MÉDIO RISCO']:
-            meta_visita = 100 if classificacao == 'MÉDIO RISCO' else 80
-            meta_licenca = meta_visita
-        elif classificacao == 'BAIXO RISCO':
-            meta_visita = 50
-            meta_licenca = None
+denominador_30 = len(df_filtrado)
 
-        total = len(dados)
+percentual_30 = (numerador_30 / denominador_30 * 100) if denominador_30 > 0 else 0
 
-        if total > 0:
-            dentro_prazo_visita = dados.apply(
-                lambda row: (pd.notnull(row['1ª INSPEÇÃO']) and row['1ª INSPEÇÃO'] <= row['ENTRADA'] + timedelta(days=30)) or
-                            (pd.isnull(row['1ª INSPEÇÃO']) and datetime.now() <= row['ENTRADA'] + timedelta(days=30)),
-                axis=1
-            ).sum()
+st.markdown(f"""
+### 🕒 1ª Visita em até 30 dias
+- ✅ **{percentual_30:.2f}%** no prazo
+- 🎯 **Numerador:** {numerador_30}
+- 📊 **Denominador:** {denominador_30}
+""")
 
-            perc_visita = dentro_prazo_visita / total * 100
+# Indicador: Processo finalizado em até 90 dias
+situacoes_excluir_90 = ["EM INSPEÇÃO", "AGUARDANDO 1ª INSPEÇÃO", "PENDÊNCIA DOCUMENTAL"]
+df_90 = df_filtrado[~df_filtrado['SITUAÇÃO'].isin(situacoes_excluir_90)]
 
-            dados_concluidos = dados[dados['SITUAÇÃO'].isin(['APROVADO', 'LICENÇA LIBERADA'])]
-            total_concluidos = len(dados_concluidos)
+numerador_90 = df_90.apply(
+    lambda row: pd.notnull(row['DATA_CONCLUSAO']) and row['DATA_CONCLUSAO'] <= row['PREVISÃO CONCLUSÃO'],
+    axis=1
+).sum()
 
-            if classificacao != 'BAIXO RISCO' and total_concluidos > 0:
-                dentro_prazo_conclusao = dados_concluidos.apply(
-                    lambda row: (pd.notnull(row['DATA_CONCLUSAO']) and row['DATA_CONCLUSAO'] <= row['ENTRADA'] + timedelta(days=90)) or
-                                (pd.isnull(row['DATA_CONCLUSAO']) and datetime.now() <= row['ENTRADA'] + timedelta(days=90)),
-                    axis=1
-                ).sum()
+denominador_90 = len(df_filtrado)
 
-                perc_conclusao = dentro_prazo_conclusao / total_concluidos * 100
+percentual_90 = (numerador_90 / denominador_90 * 100) if denominador_90 > 0 else 0
 
-                st.markdown(f"""
-                ### {classificacao}
-                - **Inspecionados no Prazo:** {perc_visita:.2f}% (Meta ≥ {meta_visita}%)
-                - **Licenciados no Prazo:** {perc_conclusao:.2f}% (Meta ≥ {meta_licenca}%)
-                """)
+st.markdown(f"""
+### 📜 Processo finalizado em até 90 dias
+- ✅ **{percentual_90:.2f}%** no prazo
+- 🎯 **Numerador:** {numerador_90}
+- 📊 **Denominador:** {denominador_90}
+""")
 
-                resumo_indicadores.append({
-                    'Classificação': classificacao,
-                    'Meta Inspeção (%)': meta_visita,
-                    'Resultado Inspeção (%)': f'{perc_visita:.2f}',
-                    'Meta Licença (%)': meta_licenca,
-                    'Resultado Licença (%)': f'{perc_conclusao:.2f}'
-                })
+# Gráfico de Justificativas dos Indeferidos
+st.subheader('Justificativas dos Indeferidos')
 
-            else:
-                st.markdown(f"""
-                ### {classificacao}
-                - **Inspecionados no Prazo:** {perc_visita:.2f}% (Meta ≥ {meta_visita}%)
-                """)
+df_indeferido = df_filtrado[df_filtrado['SITUAÇÃO'] == "INDEFERIDO"]
 
-                resumo_indicadores.append({
-                    'Classificação': classificacao,
-                    'Meta Inspeção (%)': meta_visita,
-                    'Resultado Inspeção (%)': f'{perc_visita:.2f}',
-                    'Meta Licença (%)': '',
-                    'Resultado Licença (%)': ''
-                })
+if not df_indeferido.empty:
+    graf_just = px.bar(
+        df_indeferido.groupby('JUSTIFICATIVA').size().reset_index(name='Quantidade'),
+        x='JUSTIFICATIVA',
+        y='Quantidade',
+        title='Distribuição das Justificativas (Indeferidos)',
+        text_auto=True
+    )
+    st.plotly_chart(graf_just, use_container_width=True)
+else:
+    st.info("Não há registros com situação 'INDEFERIDO' no filtro atual.")
 
-# 🔸 Gráficos
+# Gráficos Gerais
 g1 = px.bar(df_filtrado, x='TERRITÓRIO', color='CLASSIFICAÇÃO', title='Distribuição de Inspeções por Território')
 st.plotly_chart(g1, use_container_width=True)
 
 g2 = px.histogram(df_filtrado, x='CLASSIFICAÇÃO', title='Distribuição por Classificação')
 st.plotly_chart(g2, use_container_width=True)
 
-# 🔸 Tabela
+# Tabela
 st.subheader('Tabela de Dados Filtrados')
 st.dataframe(df_filtrado)
 
-# 🔥 Download do Relatório Excel
+# Download do Relatório Excel
 st.subheader('📥 Download do Relatório Excel')
 
 output = io.BytesIO()
 
 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
     df_filtrado.to_excel(writer, sheet_name='Dados Filtrados', index=False)
+    df_indeferido.to_excel(writer, sheet_name='Justificativas Indeferidos', index=False)
 
-    if resumo_indicadores:
-        df_resumo = pd.DataFrame(resumo_indicadores)
-        df_resumo.to_excel(writer, sheet_name='Resumo dos Indicadores', index=False)
-
-        df_explicacao = pd.DataFrame({
-            'Descrição': [
-                'Inspecionados no Prazo: Nº de inspeções realizadas até 30 dias após ENTRADA ÷ Total de processos',
-                'Licenciados no Prazo: Nº de licenças concluídas até 90 dias após ENTRADA ÷ Total de processos válidos (situação "APROVADO" ou "LICENÇA LIBERADA")',
-                'Processos com situação "INDEFERIDO" ou em aberto NÃO são considerados no cálculo de conclusão',
-                'Metas: Alto Risco ≥ 80%, Médio Risco ≥ 100%, Baixo Risco ≥ 50% (apenas para inspeções)'
-            ]
-        })
-        df_explicacao.to_excel(writer, sheet_name='Como é Calculado', index=False)
+    resumo = pd.DataFrame({
+        'Indicador': ['1ª Visita em até 30 dias', 'Processo finalizado em até 90 dias'],
+        'Percentual (%)': [percentual_30, percentual_90],
+        'Numerador': [numerador_30, numerador_90],
+        'Denominador': [denominador_30, denominador_90]
+    })
+    resumo.to_excel(writer, sheet_name='Resumo dos Indicadores', index=False)
 
 st.download_button(
     label="📥 Baixar Relatório Excel",
@@ -200,4 +180,4 @@ st.download_button(
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
 
-st.caption('Vigilância Sanitária de Ipojuca - 2025')
+st.caption('Vigilância Sanitária de Ipojuca – 2025')

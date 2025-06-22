@@ -1,51 +1,20 @@
 # Painel de Inspeções - Vigilância Sanitária de Ipojuca
 
-Este é um painel desenvolvido para a Vigilância Sanitária de Ipojuca, com o objetivo de monitorar os processos de inspeção e licenciamento sanitário no município.
+Este painel foi desenvolvido utilizando Streamlit para acompanhamento das inspeções da Vigilância Sanitária de Ipojuca. Ele permite:
 
-Os dados são atualizados automaticamente a partir de uma planilha no Google Sheets, alimentada manualmente pelo setor.
+- Filtros dinâmicos por protocolo, CNPJ, estabelecimento, atividade, classificação, território, situação e entrada.
+- Cálculo de dois indicadores principais:
+  - **1ª Visita em até 30 dias**
+  - **Processo finalizado em até 90 dias**
+- Visualização de gráficos dinâmicos e tabela interativa.
+- Download do relatório Excel contendo:
+  - Dados filtrados
+  - Resumo dos indicadores
+  - Justificativas dos processos Indeferidos
 
-## 🚀 Funcionalidades
+## Como executar
 
-- Filtros por:
-  - Protocolo
-  - CNPJ
-  - Estabelecimento
-  - Atividade
-  - Classificação de Risco
-  - Território
-  - Situação
-  - Período de Entrada (com calendário)
-
-- Resumo detalhado da seleção quando filtrado por um único protocolo.
-
-- Indicadores de desempenho:
-  - **Inspecionados no Prazo:** Percentual de inspeções realizadas em até 30 dias após a entrada do processo.
-  - **Licenciados no Prazo:** Percentual de licenças sanitárias concluídas em até 90 dias após a entrada (exceto processos indeferidos).
-
-- Metas:
-  - **Alto Risco:** ≥ 80% (inspeção e licenciamento no prazo).
-  - **Médio Risco:** ≥ 100% (inspeção e licenciamento no prazo).
-  - **Baixo Risco:** ≥ 50% (apenas para inspeções no prazo).
-
-- Gráficos dinâmicos:
-  - Distribuição por Território.
-  - Distribuição por Classificação.
-
-- **Download do relatório em Excel**, com:
-  - Aba de dados filtrados.
-  - Aba de resumo dos indicadores.
-  - Aba explicando como são feitos os cálculos.
-
-## 🔗 Fonte dos Dados
-
-- Dados alimentados manualmente pela equipe da Vigilância Sanitária.
-- Planilha do Google Sheets:  
-[🔗 Link para a Planilha](https://docs.google.com/spreadsheets/d/1nKoAEXQ0QZOrIt-0CMvW5MOt9Q_FC8Ak/edit)
-
-## 🛠️ Instalação e Execução Local
-
-1. Clone este repositório:
-
+1. Clone o repositório.
+2. Instale as dependências:
 ```bash
-git clone https://github.com/seu-usuario/seu-repositorio.git
-cd seu-repositorio
+pip install -r requirements.txt
