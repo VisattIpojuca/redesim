@@ -7,28 +7,31 @@ import io
 st.set_page_config(page_title="Painel VISA Ipojuca", layout="wide")
 st.title("Painel de Inspeções - Vigilância Sanitária de Ipojuca")
 
+# 🔗 Carregar dados da planilha Google
 @st.cache_data
 def carregar_dados():
     url = "https://docs.google.com/spreadsheets/d/1nKoAEXQ0QZOrIt-0CMvW5MOt9Q_FC8Ak/export?format=csv"
     df = pd.read_csv(url)
 
+    # Renomear colunas
     df.rename(columns={
         'NOME': 'ESTABELECIMENTO',
         'CONCLUSÃO': 'SITUAÇÃO',
         'DATA CONCLUSÃO': 'DATA_CONCLUSAO'
     }, inplace=True)
 
+    # Conversão de datas
     df['ENTRADA'] = pd.to_datetime(df['ENTRADA'], errors='coerce')
     df['1ª INSPEÇÃO'] = pd.to_datetime(df['1ª INSPEÇÃO'], errors='coerce')
     df['DATA_CONCLUSAO'] = pd.to_datetime(df['DATA_CONCLUSAO'], errors='coerce')
     df['PREVISÃO CONCLUSÃO'] = pd.to_datetime(df['PREVISÃO CONCLUSÃO'], errors='coerce')
-    df['PREVISAO_1A_INSP'] = pd.to_datetime(df['PREVISÃO 1ª INSPEÇÃO'], errors='coerce')
+    df['PREVISAO_1A_INSP'] = pd.to_datetime(df['PREV 1ª INSP'], errors='coerce')
 
     return df
 
 df = carregar_dados()
 
-# Filtros
+# 🔍 Filtros
 st.sidebar.header('Filtros')
 
 filtro_protocolo = st.sidebar.multiselect('PROTOCOLO', sorted(df['PROTOCOLO'].dropna().unique()))
@@ -39,6 +42,7 @@ filtro_classificacao = st.sidebar.multiselect('CLASSIFICAÇÃO', sorted(df['CLAS
 filtro_territorio = st.sidebar.multiselect('TERRITÓRIO', sorted(df['TERRITÓRIO'].dropna().unique()))
 filtro_situacao = st.sidebar.multiselect('SITUAÇÃO', sorted(df['SITUAÇÃO'].dropna().unique()))
 
+# Filtro de datas
 data_min = df['ENTRADA'].min()
 data_max = df['ENTRADA'].max()
 
@@ -49,6 +53,7 @@ data_inicio, data_fim = st.sidebar.date_input(
     max_value=data_max
 )
 
+# Aplicar filtros
 df_filtrado = df.copy()
 
 if filtro_protocolo:
@@ -71,6 +76,7 @@ df_filtrado = df_filtrado[
     (df_filtrado['ENTRADA'] <= pd.to_datetime(data_fim))
 ]
 
+# 🔸 Resumo da seleção
 if len(filtro_protocolo) == 1:
     resumo = df_filtrado[df_filtrado['PROTOCOLO'] == filtro_protocolo[0]]
     if not resumo.empty:
@@ -86,9 +92,10 @@ if len(filtro_protocolo) == 1:
         **Justificativa:** {r.get('JUSTIFICATIVA', '')}  
         """)
 
-# Indicador: 1ª Visita em até 30 dias
+# 🔸 Indicadores Atualizados
 st.subheader('Indicadores de Desempenho')
 
+## Indicador 1: 1ª Visita em até 30 dias
 situacoes_excluir_30 = ["INDEFERIDO", "AGUARDANDO 1ª INSPEÇÃO", "APROVADO", "PENDÊNCIA DOCUMENTAL"]
 df_30 = df_filtrado[~df_filtrado['SITUAÇÃO'].isin(situacoes_excluir_30)]
 
@@ -108,7 +115,7 @@ st.markdown(f"""
 - 📊 **Denominador:** {denominador_30}
 """)
 
-# Indicador: Processo finalizado em até 90 dias
+## Indicador 2: Processo finalizado em até 90 dias
 situacoes_excluir_90 = ["EM INSPEÇÃO", "AGUARDANDO 1ª INSPEÇÃO", "PENDÊNCIA DOCUMENTAL"]
 df_90 = df_filtrado[~df_filtrado['SITUAÇÃO'].isin(situacoes_excluir_90)]
 
@@ -128,7 +135,7 @@ st.markdown(f"""
 - 📊 **Denominador:** {denominador_90}
 """)
 
-# Gráfico de Justificativas dos Indeferidos
+# 🔥 Gráfico de Justificativas dos Indeferidos
 st.subheader('Justificativas dos Indeferidos')
 
 df_indeferido = df_filtrado[df_filtrado['SITUAÇÃO'] == "INDEFERIDO"]
@@ -145,18 +152,18 @@ if not df_indeferido.empty:
 else:
     st.info("Não há registros com situação 'INDEFERIDO' no filtro atual.")
 
-# Gráficos Gerais
+# 🔸 Gráficos Gerais
 g1 = px.bar(df_filtrado, x='TERRITÓRIO', color='CLASSIFICAÇÃO', title='Distribuição de Inspeções por Território')
 st.plotly_chart(g1, use_container_width=True)
 
 g2 = px.histogram(df_filtrado, x='CLASSIFICAÇÃO', title='Distribuição por Classificação')
 st.plotly_chart(g2, use_container_width=True)
 
-# Tabela
+# 🔸 Tabela
 st.subheader('Tabela de Dados Filtrados')
 st.dataframe(df_filtrado)
 
-# Download do Relatório Excel
+# 🔥 Download do Relatório Excel
 st.subheader('📥 Download do Relatório Excel')
 
 output = io.BytesIO()

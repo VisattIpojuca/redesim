@@ -1,20 +1,48 @@
 # Painel de Inspeções - Vigilância Sanitária de Ipojuca
 
-Este painel foi desenvolvido utilizando Streamlit para acompanhamento das inspeções da Vigilância Sanitária de Ipojuca. Ele permite:
+Este é um painel desenvolvido para a Vigilância Sanitária de Ipojuca, com o objetivo de monitorar os processos de inspeções, emissão de licenças e acompanhamento dos prazos.
 
-- Filtros dinâmicos por protocolo, CNPJ, estabelecimento, atividade, classificação, território, situação e entrada.
+## 🚀 Funcionalidades
+
+- Filtros dinâmicos por:
+  - Protocolo
+  - CNPJ
+  - Estabelecimento
+  - Atividade
+  - Classificação
+  - Território
+  - Situação
+  - Entrada (com seletor de datas)
+
+- Resumo da seleção quando selecionado um único protocolo.
+
 - Cálculo de dois indicadores principais:
-  - **1ª Visita em até 30 dias**
-  - **Processo finalizado em até 90 dias**
-- Visualização de gráficos dinâmicos e tabela interativa.
-- Download do relatório Excel contendo:
-  - Dados filtrados
-  - Resumo dos indicadores
-  - Justificativas dos processos Indeferidos
+  - **1ª Visita em até 30 dias**  
+    (Avalia se a primeira inspeção foi realizada até a data prevista — Coluna "PREV 1ª INSP".)
 
-## Como executar
+  - **Processo finalizado em até 90 dias**  
+    (Avalia se o processo foi concluído até a data prevista — Coluna "PREVISÃO CONCLUSÃO".)
 
-1. Clone o repositório.
-2. Instale as dependências:
+- Gráfico das justificativas dos processos **indeferidos**.
+
+- Visualização de gráficos interativos:
+  - Distribuição por território
+  - Distribuição por classificação
+
+- Tabela de dados filtrados.
+
+- Exportação de relatório Excel com três abas:
+  - Dados Filtrados
+  - Resumo dos Indicadores
+  - Justificativas dos Indeferidos
+
+---
+
+## 🛠️ Como Executar
+
+1. Clone este repositório.
+
+2. Instale as dependências com:
+
 ```bash
 pip install -r requirements.txt
