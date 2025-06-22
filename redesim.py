@@ -6,7 +6,7 @@ import io
 
 # Configuração da página
 st.set_page_config(page_title="Painel VISA Ipojuca", layout="wide")
-st.title("Painel de Indicadores REDESIM - Vigilância Sanitária de Ipojuca")
+st.title("Painel de Inspeções - Vigilância Sanitária de Ipojuca")
 
 # 🔗 Função para carregar dados da planilha Google
 @st.cache_data
@@ -34,6 +34,11 @@ df = carregar_dados()
 
 # 🔍 Filtros na barra lateral
 st.sidebar.header('Filtros')
+
+indicador_selecionado = st.sidebar.selectbox(
+    "Selecione o Indicador",
+    ["1ª Visita em até 30 dias", "Processo finalizado em até 90 dias"]
+)
 
 filtro_protocolo = st.sidebar.multiselect('PROTOCOLO', sorted(df['PROTOCOLO'].dropna().unique()))
 filtro_cnpj = st.sidebar.multiselect('CNPJ', sorted(df['CNPJ'].dropna().unique()))
@@ -92,45 +97,46 @@ if len(filtro_protocolo) == 1:
         **Justificativa:** {r.get('JUSTIFICATIVA', '')}  
         """)
 
-# 🔥 Indicador 1 – 1ª Visita em até 30 dias
-df_30 = df_filtrado[~df_filtrado['SITUAÇÃO'].isin(["AGUARDANDO 1ª INSPEÇÃO", "PENDÊNCIA DOCUMENTAL"])]
+# 🔥 Indicadores — conforme o filtro "Indicador"
+if indicador_selecionado == "1ª Visita em até 30 dias":
+    df_30 = df_filtrado[~df_filtrado['SITUAÇÃO'].isin(["AGUARDANDO 1ª INSPEÇÃO", "PENDÊNCIA DOCUMENTAL"])]
 
-filtro_valido_30 = (
-    (pd.notnull(df_30['1ª INSPEÇÃO'])) &
-    (df_30['1ª INSPEÇÃO'] <= df_30['PREVISAO_1A_INSP'])
-)
+    filtro_valido_30 = (
+        (pd.notnull(df_30['1ª INSPEÇÃO'])) &
+        (df_30['1ª INSPEÇÃO'] <= df_30['PREVISAO_1A_INSP'])
+    )
 
-numerador_30 = filtro_valido_30.sum()
-denominador_30 = len(df_filtrado)
+    numerador_30 = filtro_valido_30.sum()
+    denominador_30 = len(df_filtrado)
 
-percentual_30 = (numerador_30 / denominador_30 * 100) if denominador_30 > 0 else 0
+    percentual_30 = (numerador_30 / denominador_30 * 100) if denominador_30 > 0 else 0
 
-st.markdown(f"""
-### 🕒 1ª Visita em até 30 dias
-- ✅ **{percentual_30:.2f}%** no prazo
-- 🎯 **Numerador:** {numerador_30}
-- 📊 **Denominador:** {denominador_30}
-""")
+    st.markdown(f"""
+    ## 🕒 Indicador: 1ª Visita em até 30 dias
+    - ✅ **{percentual_30:.2f}%** no prazo
+    - 🎯 **Numerador:** {numerador_30}
+    - 📊 **Denominador:** {denominador_30}
+    """)
 
-# 🔥 Indicador 2 – Processo finalizado em até 90 dias
-df_90 = df_filtrado[~df_filtrado['SITUAÇÃO'].isin(["EM INSPEÇÃO", "AGUARDANDO 1ª INSPEÇÃO", "PENDÊNCIA DOCUMENTAL"])]
+elif indicador_selecionado == "Processo finalizado em até 90 dias":
+    df_90 = df_filtrado[~df_filtrado['SITUAÇÃO'].isin(["EM INSPEÇÃO", "AGUARDANDO 1ª INSPEÇÃO", "PENDÊNCIA DOCUMENTAL"])]
 
-filtro_valido_90 = (
-    (pd.notnull(df_90['DATA_CONCLUSAO'])) &
-    (df_90['DATA_CONCLUSAO'] <= df_90['PREVISÃO CONCLUSÃO'])
-)
+    filtro_valido_90 = (
+        (pd.notnull(df_90['DATA_CONCLUSAO'])) &
+        (df_90['DATA_CONCLUSAO'] <= df_90['PREVISÃO CONCLUSÃO'])
+    )
 
-numerador_90 = filtro_valido_90.sum()
-denominador_90 = len(df_filtrado)
+    numerador_90 = filtro_valido_90.sum()
+    denominador_90 = len(df_filtrado)
 
-percentual_90 = (numerador_90 / denominador_90 * 100) if denominador_90 > 0 else 0
+    percentual_90 = (numerador_90 / denominador_90 * 100) if denominador_90 > 0 else 0
 
-st.markdown(f"""
-### 📜 Processo finalizado em até 90 dias
-- ✅ **{percentual_90:.2f}%** no prazo
-- 🎯 **Numerador:** {numerador_90}
-- 📊 **Denominador:** {denominador_90}
-""")
+    st.markdown(f"""
+    ## 📜 Indicador: Processo finalizado em até 90 dias
+    - ✅ **{percentual_90:.2f}%** no prazo
+    - 🎯 **Numerador:** {numerador_90}
+    - 📊 **Denominador:** {denominador_90}
+    """)
 
 # 📊 Gráfico de Justificativas dos Indeferidos
 st.subheader('Justificativas dos Indeferidos')
@@ -171,9 +177,11 @@ with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
 
     resumo = pd.DataFrame({
         'Indicador': ['1ª Visita em até 30 dias', 'Processo finalizado em até 90 dias'],
-        'Percentual (%)': [percentual_30, percentual_90],
-        'Numerador': [numerador_30, numerador_90],
-        'Denominador': [denominador_30, denominador_90]
+        'Numerador': [numerador_30 if 'numerador_30' in locals() else '',
+                      numerador_90 if 'numerador_90' in locals() else ''],
+        'Denominador': [denominador_30, denominador_90],
+        'Percentual (%)': [percentual_30 if 'percentual_30' in locals() else '',
+                            percentual_90 if 'percentual_90' in locals() else '']
     })
     resumo.to_excel(writer, sheet_name='Resumo dos Indicadores', index=False)
 
