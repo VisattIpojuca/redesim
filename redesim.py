@@ -4,24 +4,20 @@ import plotly.express as px
 from datetime import datetime
 import io
 
-# Configuração da página
 st.set_page_config(page_title="Painel VISA Ipojuca", layout="wide")
 st.title("Painel de Inspeções - Vigilância Sanitária de Ipojuca")
 
-# Função para carregar os dados da planilha pública
 @st.cache_data
 def carregar_dados():
     url = "https://docs.google.com/spreadsheets/d/1nKoAEXQ0QZOrIt-0CMvW5MOt9Q_FC8Ak/export?format=csv"
     df = pd.read_csv(url)
 
-    # Renomear colunas para facilitar o uso
     df.rename(columns={
         'NOME': 'ESTABELECIMENTO',
         'CONCLUSÃO': 'SITUAÇÃO',
         'DATA CONCLUSÃO': 'DATA_CONCLUSAO'
     }, inplace=True)
 
-    # Conversão de datas
     df['ENTRADA'] = pd.to_datetime(df['ENTRADA'], errors='coerce')
     df['1ª INSPEÇÃO'] = pd.to_datetime(df['1ª INSPEÇÃO'], errors='coerce')
     df['DATA_CONCLUSAO'] = pd.to_datetime(df['DATA_CONCLUSAO'], errors='coerce')
@@ -32,13 +28,7 @@ def carregar_dados():
 
 df = carregar_dados()
 
-# Filtros na barra lateral
 st.sidebar.header('Filtros')
-
-indicador_selecionado = st.sidebar.selectbox(
-    "Selecione o Indicador",
-    ["1ª Visita em até 30 dias", "Processo finalizado em até 90 dias"]
-)
 
 filtro_protocolo = st.sidebar.multiselect('PROTOCOLO', sorted(df['PROTOCOLO'].dropna().unique()))
 filtro_cnpj = st.sidebar.multiselect('CNPJ', sorted(df['CNPJ'].dropna().unique()))
@@ -50,17 +40,16 @@ filtro_situacao = st.sidebar.multiselect('SITUAÇÃO', sorted(df['SITUAÇÃO'].d
 
 data_min = df['ENTRADA'].min()
 data_max = df['ENTRADA'].max()
+data_inicio, data_fim = st.sidebar.date_input('PERÍODO', [data_min, data_max], min_value=data_min, max_value=data_max)
 
-data_inicio, data_fim = st.sidebar.date_input(
-    'Período de ENTRADA',
-    [data_min, data_max],
-    min_value=data_min,
-    max_value=data_max
+# 🔽 Filtro de indicador — movido para o final e sem valor padrão
+indicador_selecionado = st.sidebar.selectbox(
+    "Selecione o Indicador",
+    ["", "1ª Visita em até 30 dias", "Processo finalizado em até 90 dias"]
 )
 
 # Aplicar filtros
 df_filtrado = df.copy()
-
 if filtro_protocolo:
     df_filtrado = df_filtrado[df_filtrado['PROTOCOLO'].isin(filtro_protocolo)]
 if filtro_cnpj:
@@ -97,25 +86,21 @@ if len(filtro_protocolo) == 1:
         **Justificativa:** {r.get('JUSTIFICATIVA', '')}  
         """)
 
-# Indicadores
+# Indicadores — apenas se selecionado
 if indicador_selecionado == "1ª Visita em até 30 dias":
     df_30 = df_filtrado.copy()
-
     df_30 = df_30[
         ~(
             (df_30['SITUAÇÃO'] == "AGUARDANDO 1ª INSPEÇÃO") |
             ((df_30['SITUAÇÃO'] == "INDEFERIDO") & (df_30['1ª INSPEÇÃO'].isna()))
         )
     ]
-
     filtro_valido_30 = (
         (pd.notnull(df_30['1ª INSPEÇÃO'])) &
         (df_30['1ª INSPEÇÃO'] <= df_30['PREVISAO_1A_INSP'])
     )
-
     numerador_30 = filtro_valido_30.sum()
     denominador_30 = len(df_filtrado)
-
     percentual_30 = (numerador_30 / denominador_30 * 100) if denominador_30 > 0 else 0
 
     st.markdown(f"""
@@ -129,15 +114,12 @@ elif indicador_selecionado == "Processo finalizado em até 90 dias":
     df_90 = df_filtrado[
         ~df_filtrado['SITUAÇÃO'].isin(["EM INSPEÇÃO", "AGUARDANDO 1ª INSPEÇÃO", "PENDÊNCIA DOCUMENTAL"])
     ]
-
     filtro_valido_90 = (
         (pd.notnull(df_90['DATA_CONCLUSAO'])) &
         (df_90['DATA_CONCLUSAO'] <= df_90['PREVISÃO CONCLUSÃO'])
     )
-
     numerador_90 = filtro_valido_90.sum()
     denominador_90 = len(df_filtrado)
-
     percentual_90 = (numerador_90 / denominador_90 * 100) if denominador_90 > 0 else 0
 
     st.markdown(f"""
@@ -147,10 +129,9 @@ elif indicador_selecionado == "Processo finalizado em até 90 dias":
     - 📊 **Denominador:** {denominador_90}
     """)
 
-# Gráfico de justificativas dos Indeferidos
+# Gráfico de justificativas
 st.subheader('Justificativas dos Indeferidos')
 df_indeferido = df_filtrado[df_filtrado['SITUAÇÃO'] == "INDEFERIDO"]
-
 if not df_indeferido.empty:
     graf_just = px.bar(
         df_indeferido.groupby('JUSTIFICATIVA').size().reset_index(name='Quantidade'),
@@ -170,25 +151,19 @@ st.plotly_chart(g1, use_container_width=True)
 g2 = px.histogram(df_filtrado, x='CLASSIFICAÇÃO', title='Distribuição por Classificação')
 st.plotly_chart(g2, use_container_width=True)
 
-# Tabela de dados com formatação de datas
+# Tabela com datas formatadas
 st.subheader('Tabela de Dados Filtrados')
-
 df_mostrar = df_filtrado.copy()
-for col in ['ENTRADA', 'DATA_CONCLUSAO', 'PREVISÃO CONCLUSÃO']:
-    if col in df_mostrar.columns:
-        df_mostrar[col] = df_mostrar[col].dt.strftime('%d/%m/%Y')
-
+for col in df_mostrar.select_dtypes(include='datetime'):
+    df_mostrar[col] = df_mostrar[col].dt.strftime('%d/%m/%Y')
 st.dataframe(df_mostrar)
 
-# Exportação Excel
+# Download Excel
 st.subheader("📥 Baixar Relatório Excel")
-
 buffer = io.BytesIO()
-
 with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
     df_filtrado.to_excel(writer, sheet_name="Dados Filtrados", index=False)
     df_indeferido.to_excel(writer, sheet_name="Indeferidos", index=False)
-
     resumo = pd.DataFrame({
         'Indicador': ['1ª Visita em até 30 dias', 'Processo finalizado em até 90 dias'],
         'Numerador': [numerador_30 if 'numerador_30' in locals() else '',
