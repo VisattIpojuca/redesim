@@ -8,13 +8,13 @@ import io
 st.set_page_config(page_title="Painel VISA Ipojuca", layout="wide")
 st.title("Painel de Inspeções - Vigilância Sanitária de Ipojuca")
 
-# 🔗 Função para carregar dados da planilha Google
+# Função para carregar os dados da planilha pública
 @st.cache_data
 def carregar_dados():
     url = "https://docs.google.com/spreadsheets/d/1nKoAEXQ0QZOrIt-0CMvW5MOt9Q_FC8Ak/export?format=csv"
     df = pd.read_csv(url)
 
-    # Renomear colunas
+    # Renomear colunas para facilitar o uso
     df.rename(columns={
         'NOME': 'ESTABELECIMENTO',
         'CONCLUSÃO': 'SITUAÇÃO',
@@ -32,7 +32,7 @@ def carregar_dados():
 
 df = carregar_dados()
 
-# 🔍 Filtros na barra lateral
+# Filtros na barra lateral
 st.sidebar.header('Filtros')
 
 indicador_selecionado = st.sidebar.selectbox(
@@ -58,7 +58,7 @@ data_inicio, data_fim = st.sidebar.date_input(
     max_value=data_max
 )
 
-# 🔧 Aplicar filtros
+# Aplicar filtros
 df_filtrado = df.copy()
 
 if filtro_protocolo:
@@ -81,7 +81,7 @@ df_filtrado = df_filtrado[
     (df_filtrado['ENTRADA'] <= pd.to_datetime(data_fim))
 ]
 
-# 🔸 Resumo da seleção
+# Resumo da seleção
 if len(filtro_protocolo) == 1:
     resumo = df_filtrado[df_filtrado['PROTOCOLO'] == filtro_protocolo[0]]
     if not resumo.empty:
@@ -97,9 +97,16 @@ if len(filtro_protocolo) == 1:
         **Justificativa:** {r.get('JUSTIFICATIVA', '')}  
         """)
 
-# 🔥 Indicadores — conforme o filtro "Indicador"
+# Indicadores
 if indicador_selecionado == "1ª Visita em até 30 dias":
-    df_30 = df_filtrado[~df_filtrado['SITUAÇÃO'].isin(["AGUARDANDO 1ª INSPEÇÃO", "PENDÊNCIA DOCUMENTAL"])]
+    df_30 = df_filtrado.copy()
+
+    df_30 = df_30[
+        ~(
+            (df_30['SITUAÇÃO'] == "AGUARDANDO 1ª INSPEÇÃO") |
+            ((df_30['SITUAÇÃO'] == "INDEFERIDO") & (df_30['1ª INSPEÇÃO'].isna()))
+        )
+    ]
 
     filtro_valido_30 = (
         (pd.notnull(df_30['1ª INSPEÇÃO'])) &
@@ -119,7 +126,9 @@ if indicador_selecionado == "1ª Visita em até 30 dias":
     """)
 
 elif indicador_selecionado == "Processo finalizado em até 90 dias":
-    df_90 = df_filtrado[~df_filtrado['SITUAÇÃO'].isin(["EM INSPEÇÃO", "AGUARDANDO 1ª INSPEÇÃO", "PENDÊNCIA DOCUMENTAL"])]
+    df_90 = df_filtrado[
+        ~df_filtrado['SITUAÇÃO'].isin(["EM INSPEÇÃO", "AGUARDANDO 1ª INSPEÇÃO", "PENDÊNCIA DOCUMENTAL"])
+    ]
 
     filtro_valido_90 = (
         (pd.notnull(df_90['DATA_CONCLUSAO'])) &
@@ -138,9 +147,8 @@ elif indicador_selecionado == "Processo finalizado em até 90 dias":
     - 📊 **Denominador:** {denominador_90}
     """)
 
-# 📊 Gráfico de Justificativas dos Indeferidos
+# Gráfico de justificativas dos Indeferidos
 st.subheader('Justificativas dos Indeferidos')
-
 df_indeferido = df_filtrado[df_filtrado['SITUAÇÃO'] == "INDEFERIDO"]
 
 if not df_indeferido.empty:
@@ -155,41 +163,42 @@ if not df_indeferido.empty:
 else:
     st.info("Não há registros com situação 'INDEFERIDO' no filtro atual.")
 
-# 📈 Gráficos gerais
+# Gráficos gerais
 g1 = px.bar(df_filtrado, x='TERRITÓRIO', color='CLASSIFICAÇÃO', title='Distribuição de Inspeções por Território')
 st.plotly_chart(g1, use_container_width=True)
 
 g2 = px.histogram(df_filtrado, x='CLASSIFICAÇÃO', title='Distribuição por Classificação')
 st.plotly_chart(g2, use_container_width=True)
 
-# 🗂️ Tabela de dados
+# Tabela
 st.subheader('Tabela de Dados Filtrados')
 st.dataframe(df_filtrado)
 
-# 💾 Download do Relatório Excel
-st.subheader('📥 Download do Relatório Excel')
+# Exportação Excel corrigida
+st.subheader("📥 Baixar Relatório Excel")
 
-output = io.BytesIO()
+buffer = io.BytesIO()
 
-with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-    df_filtrado.to_excel(writer, sheet_name='Dados Filtrados', index=False)
-    df_indeferido.to_excel(writer, sheet_name='Justificativas Indeferidos', index=False)
+with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+    df_filtrado.to_excel(writer, sheet_name="Dados Filtrados", index=False)
+    df_indeferido.to_excel(writer, sheet_name="Indeferidos", index=False)
 
     resumo = pd.DataFrame({
         'Indicador': ['1ª Visita em até 30 dias', 'Processo finalizado em até 90 dias'],
         'Numerador': [numerador_30 if 'numerador_30' in locals() else '',
                       numerador_90 if 'numerador_90' in locals() else ''],
-        'Denominador': [denominador_30, denominador_90],
+        'Denominador': [denominador_30 if 'denominador_30' in locals() else '',
+                        denominador_90 if 'denominador_90' in locals() else ''],
         'Percentual (%)': [percentual_30 if 'percentual_30' in locals() else '',
-                            percentual_90 if 'percentual_90' in locals() else '']
+                           percentual_90 if 'percentual_90' in locals() else '']
     })
-    resumo.to_excel(writer, sheet_name='Resumo dos Indicadores', index=False)
+    resumo.to_excel(writer, sheet_name="Resumo dos Indicadores", index=False)
 
 st.download_button(
-    label="📥 Baixar Relatório Excel",
-    data=output.getvalue(),
+    label="📄 Baixar Relatório Excel",
+    data=buffer.getvalue(),
     file_name="Relatorio_VISA_Ipojuca.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
 
-st.caption('Vigilância Sanitária de Ipojuca – 2025')
+st.caption("Vigilância Sanitária de Ipojuca – 2025")
