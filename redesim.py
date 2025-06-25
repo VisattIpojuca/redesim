@@ -170,11 +170,17 @@ st.plotly_chart(g1, use_container_width=True)
 g2 = px.histogram(df_filtrado, x='CLASSIFICAÇÃO', title='Distribuição por Classificação')
 st.plotly_chart(g2, use_container_width=True)
 
-# Tabela
+# Tabela de dados com formatação de datas
 st.subheader('Tabela de Dados Filtrados')
-st.dataframe(df_filtrado)
 
-# Exportação Excel corrigida
+df_mostrar = df_filtrado.copy()
+for col in ['ENTRADA', 'DATA_CONCLUSAO', 'PREVISÃO CONCLUSÃO']:
+    if col in df_mostrar.columns:
+        df_mostrar[col] = df_mostrar[col].dt.strftime('%d/%m/%Y')
+
+st.dataframe(df_mostrar)
+
+# Exportação Excel
 st.subheader("📥 Baixar Relatório Excel")
 
 buffer = io.BytesIO()
