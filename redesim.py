@@ -28,7 +28,6 @@ def carregar_dados():
 
 df = carregar_dados()
 
-# Filtros
 st.sidebar.header('Filtros')
 
 filtro_protocolo = st.sidebar.multiselect('PROTOCOLO', sorted(df['PROTOCOLO'].dropna().unique()))
@@ -39,18 +38,15 @@ filtro_classificacao = st.sidebar.multiselect('CLASSIFICAÇÃO', sorted(df['CLAS
 filtro_territorio = st.sidebar.multiselect('TERRITÓRIO', sorted(df['TERRITÓRIO'].dropna().unique()))
 filtro_situacao = st.sidebar.multiselect('SITUAÇÃO', sorted(df['SITUAÇÃO'].dropna().unique()))
 
-# Filtro de datas
 data_min = df['ENTRADA'].min()
 data_max = df['ENTRADA'].max()
 data_inicio, data_fim = st.sidebar.date_input('PERÍODO', [data_min, data_max], min_value=data_min, max_value=data_max)
 
-# Filtro do Indicador
 indicador_selecionado = st.sidebar.selectbox(
     "Selecione o Indicador",
     ["", "1ª Visita em até 30 dias", "Processo finalizado em até 90 dias"]
 )
 
-# Aplicar filtros
 df_filtrado = df.copy()
 if filtro_protocolo:
     df_filtrado = df_filtrado[df_filtrado['PROTOCOLO'].isin(filtro_protocolo)]
@@ -67,13 +63,12 @@ if filtro_territorio:
 if filtro_situacao:
     df_filtrado = df_filtrado[df_filtrado['SITUAÇÃO'].isin(filtro_situacao)]
 
-# Filtro de período
 df_filtrado = df_filtrado[
     (df_filtrado['ENTRADA'] >= pd.to_datetime(data_inicio)) &
     (df_filtrado['ENTRADA'] <= pd.to_datetime(data_fim))
 ]
 
-# Cálculo dos Indicadores
+# Indicadores
 if indicador_selecionado == "1ª Visita em até 30 dias":
     df_30 = df_filtrado.copy()
 
@@ -81,11 +76,14 @@ if indicador_selecionado == "1ª Visita em até 30 dias":
         (df_30['SITUAÇÃO'].notna()) &
         (df_30['SITUAÇÃO'] != "AGUARDANDO 1ª INSPEÇÃO") &
         (df_30['1ª INSPEÇÃO'].notna()) &
-        (df_30['PREVISAO_1A_INSP'].notna()) &
-        (df_30['1ª INSPEÇÃO'] <= df_30['PREVISAO_1A_INSP'])
+        (df_30['PREVISAO_1A_INSP'].notna())
     ]
 
-    numerador_30 = len(df_30_validos)
+    df_30_no_prazo = df_30_validos[
+        df_30_validos['1ª INSPEÇÃO'] <= df_30_validos['PREVISAO_1A_INSP']
+    ]
+
+    numerador_30 = len(df_30_no_prazo)
     denominador_30 = len(df_filtrado)
     percentual_30 = (numerador_30 / denominador_30 * 100) if denominador_30 > 0 else 0
 
@@ -102,7 +100,7 @@ elif indicador_selecionado == "Processo finalizado em até 90 dias":
     ]
 
     filtro_valido_90 = (
-        (df_90['DATA_CONCLUSAO'].notna()) &
+        df_90['DATA_CONCLUSAO'].notna() &
         (df_90['DATA_CONCLUSAO'] <= df_90['PREVISÃO CONCLUSÃO'])
     )
 
@@ -116,3 +114,23 @@ elif indicador_selecionado == "Processo finalizado em até 90 dias":
     - 🎯 **Numerador:** {numerador_90}
     - 📊 **Denominador:** {denominador_90}
     """)
+
+# Gráficos
+st.subheader("Visualização dos Dados")
+
+if not df_filtrado.empty:
+    g1 = px.bar(df_filtrado, x='TERRITÓRIO', color='CLASSIFICAÇÃO', title='Inspeções por Território')
+    st.plotly_chart(g1, use_container_width=True)
+
+    g2 = px.histogram(df_filtrado, x='CLASSIFICAÇÃO', title='Distribuição por Classificação')
+    st.plotly_chart(g2, use_container_width=True)
+
+# Tabela formatada
+st.subheader("Tabela de Dados Filtrados")
+df_visual = df_filtrado.copy()
+for col in ['ENTRADA', '1ª INSPEÇÃO', 'DATA_CONCLUSAO', 'PREVISÃO CONCLUSÃO', 'PREVISAO_1A_INSP']:
+    if col in df_visual.columns:
+        df_visual[col] = pd.to_datetime(df_visual[col], errors='coerce').dt.strftime('%d/%m/%Y')
+
+st.dataframe(df_visual)
+st.caption("Vigilância Sanitária de Ipojuca - 2025")
