@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
-import io
 
 st.set_page_config(page_title="Painel VISA Ipojuca", layout="wide")
 st.title("Painel de Inspeções - Vigilância Sanitária de Ipojuca")
@@ -15,19 +14,21 @@ def carregar_dados():
     df.rename(columns={
         'NOME': 'ESTABELECIMENTO',
         'CONCLUSÃO': 'SITUAÇÃO',
-        'DATA CONCLUSÃO': 'DATA_CONCLUSAO'
+        'DATA CONCLUSÃO': 'DATA_CONCLUSAO',
+        'PREV 1ª INSP': 'PREVISAO_1A_INSP'
     }, inplace=True)
 
     df['ENTRADA'] = pd.to_datetime(df['ENTRADA'], errors='coerce')
     df['1ª INSPEÇÃO'] = pd.to_datetime(df['1ª INSPEÇÃO'], errors='coerce')
     df['DATA_CONCLUSAO'] = pd.to_datetime(df['DATA_CONCLUSAO'], errors='coerce')
     df['PREVISÃO CONCLUSÃO'] = pd.to_datetime(df['PREVISÃO CONCLUSÃO'], errors='coerce')
-    df['PREVISAO_1A_INSP'] = pd.to_datetime(df['PREV 1ª INSP'], errors='coerce')
+    df['PREVISAO_1A_INSP'] = pd.to_datetime(df['PREVISAO_1A_INSP'], errors='coerce')
 
     return df
 
 df = carregar_dados()
 
+# Filtros
 st.sidebar.header('Filtros')
 
 filtro_protocolo = st.sidebar.multiselect('PROTOCOLO', sorted(df['PROTOCOLO'].dropna().unique()))
@@ -38,11 +39,12 @@ filtro_classificacao = st.sidebar.multiselect('CLASSIFICAÇÃO', sorted(df['CLAS
 filtro_territorio = st.sidebar.multiselect('TERRITÓRIO', sorted(df['TERRITÓRIO'].dropna().unique()))
 filtro_situacao = st.sidebar.multiselect('SITUAÇÃO', sorted(df['SITUAÇÃO'].dropna().unique()))
 
+# Filtro de datas
 data_min = df['ENTRADA'].min()
 data_max = df['ENTRADA'].max()
 data_inicio, data_fim = st.sidebar.date_input('PERÍODO', [data_min, data_max], min_value=data_min, max_value=data_max)
 
-# 🔽 Filtro de indicador — movido para o final e sem valor padrão
+# Filtro do Indicador
 indicador_selecionado = st.sidebar.selectbox(
     "Selecione o Indicador",
     ["", "1ª Visita em até 30 dias", "Processo finalizado em até 90 dias"]
@@ -65,41 +67,25 @@ if filtro_territorio:
 if filtro_situacao:
     df_filtrado = df_filtrado[df_filtrado['SITUAÇÃO'].isin(filtro_situacao)]
 
+# Filtro de período
 df_filtrado = df_filtrado[
     (df_filtrado['ENTRADA'] >= pd.to_datetime(data_inicio)) &
     (df_filtrado['ENTRADA'] <= pd.to_datetime(data_fim))
 ]
 
-# Resumo da seleção
-if len(filtro_protocolo) == 1:
-    resumo = df_filtrado[df_filtrado['PROTOCOLO'] == filtro_protocolo[0]]
-    if not resumo.empty:
-        r = resumo.iloc[0]
-        st.sidebar.subheader('Resumo da Seleção')
-        st.sidebar.markdown(f"""
-        **Estabelecimento:** {r.get('ESTABELECIMENTO', '')}  
-        **Protocolo:** {r.get('PROTOCOLO', '')}  
-        **Atividade:** {r.get('ATIVIDADE', '')}  
-        **Classificação:** {r.get('CLASSIFICAÇÃO', '')}  
-        **Território:** {r.get('TERRITÓRIO', '')}  
-        **Situação:** {r.get('SITUAÇÃO', '')}  
-        **Justificativa:** {r.get('JUSTIFICATIVA', '')}  
-        """)
-
-# Indicadores — apenas se selecionado
+# Cálculo dos Indicadores
 if indicador_selecionado == "1ª Visita em até 30 dias":
     df_30 = df_filtrado.copy()
-    df_30 = df_30[
-        ~(
-            (df_30['SITUAÇÃO'] == "AGUARDANDO 1ª INSPEÇÃO") |
-            ((df_30['SITUAÇÃO'] == "INDEFERIDO") & (df_30['1ª INSPEÇÃO'].isna()))
-        )
-    ]
-    filtro_valido_30 = (
-        (pd.notnull(df_30['1ª INSPEÇÃO'])) &
+
+    df_30_validos = df_30[
+        (df_30['SITUAÇÃO'].notna()) &
+        (df_30['SITUAÇÃO'] != "AGUARDANDO 1ª INSPEÇÃO") &
+        (df_30['1ª INSPEÇÃO'].notna()) &
+        (df_30['PREVISAO_1A_INSP'].notna()) &
         (df_30['1ª INSPEÇÃO'] <= df_30['PREVISAO_1A_INSP'])
-    )
-    numerador_30 = filtro_valido_30.sum()
+    ]
+
+    numerador_30 = len(df_30_validos)
     denominador_30 = len(df_filtrado)
     percentual_30 = (numerador_30 / denominador_30 * 100) if denominador_30 > 0 else 0
 
@@ -114,10 +100,12 @@ elif indicador_selecionado == "Processo finalizado em até 90 dias":
     df_90 = df_filtrado[
         ~df_filtrado['SITUAÇÃO'].isin(["EM INSPEÇÃO", "AGUARDANDO 1ª INSPEÇÃO", "PENDÊNCIA DOCUMENTAL"])
     ]
+
     filtro_valido_90 = (
-        (pd.notnull(df_90['DATA_CONCLUSAO'])) &
+        (df_90['DATA_CONCLUSAO'].notna()) &
         (df_90['DATA_CONCLUSAO'] <= df_90['PREVISÃO CONCLUSÃO'])
     )
+
     numerador_90 = filtro_valido_90.sum()
     denominador_90 = len(df_filtrado)
     percentual_90 = (numerador_90 / denominador_90 * 100) if denominador_90 > 0 else 0
@@ -128,58 +116,3 @@ elif indicador_selecionado == "Processo finalizado em até 90 dias":
     - 🎯 **Numerador:** {numerador_90}
     - 📊 **Denominador:** {denominador_90}
     """)
-
-# Gráfico de justificativas
-st.subheader('Justificativas dos Indeferidos')
-df_indeferido = df_filtrado[df_filtrado['SITUAÇÃO'] == "INDEFERIDO"]
-if not df_indeferido.empty:
-    graf_just = px.bar(
-        df_indeferido.groupby('JUSTIFICATIVA').size().reset_index(name='Quantidade'),
-        x='JUSTIFICATIVA',
-        y='Quantidade',
-        title='Distribuição das Justificativas (Indeferidos)',
-        text_auto=True
-    )
-    st.plotly_chart(graf_just, use_container_width=True)
-else:
-    st.info("Não há registros com situação 'INDEFERIDO' no filtro atual.")
-
-# Gráficos gerais
-g1 = px.bar(df_filtrado, x='TERRITÓRIO', color='CLASSIFICAÇÃO', title='Distribuição de Inspeções por Território')
-st.plotly_chart(g1, use_container_width=True)
-
-g2 = px.histogram(df_filtrado, x='CLASSIFICAÇÃO', title='Distribuição por Classificação')
-st.plotly_chart(g2, use_container_width=True)
-
-# Tabela com datas formatadas
-st.subheader('Tabela de Dados Filtrados')
-df_mostrar = df_filtrado.copy()
-for col in df_mostrar.select_dtypes(include='datetime'):
-    df_mostrar[col] = df_mostrar[col].dt.strftime('%d/%m/%Y')
-st.dataframe(df_mostrar)
-
-# Download Excel
-st.subheader("📥 Baixar Relatório Excel")
-buffer = io.BytesIO()
-with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-    df_filtrado.to_excel(writer, sheet_name="Dados Filtrados", index=False)
-    df_indeferido.to_excel(writer, sheet_name="Indeferidos", index=False)
-    resumo = pd.DataFrame({
-        'Indicador': ['1ª Visita em até 30 dias', 'Processo finalizado em até 90 dias'],
-        'Numerador': [numerador_30 if 'numerador_30' in locals() else '',
-                      numerador_90 if 'numerador_90' in locals() else ''],
-        'Denominador': [denominador_30 if 'denominador_30' in locals() else '',
-                        denominador_90 if 'denominador_90' in locals() else ''],
-        'Percentual (%)': [percentual_30 if 'percentual_30' in locals() else '',
-                           percentual_90 if 'percentual_90' in locals() else '']
-    })
-    resumo.to_excel(writer, sheet_name="Resumo dos Indicadores", index=False)
-
-st.download_button(
-    label="📄 Baixar Relatório Excel",
-    data=buffer.getvalue(),
-    file_name="Relatorio_VISA_Ipojuca.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
-
-st.caption("Vigilância Sanitária de Ipojuca – 2025")
