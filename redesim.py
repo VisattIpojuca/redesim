@@ -15,7 +15,8 @@ def carregar_dados():
         'NOME': 'ESTABELECIMENTO',
         'CONCLUSÃO': 'SITUAÇÃO',
         'DATA CONCLUSÃO': 'DATA_CONCLUSAO',
-        'PREV 1ª INSP': 'PREVISAO_1A_INSP'
+        'PREV 1ª INSP': 'PREVISAO_1A_INSP',
+        'Numerador 1': 'NUMERADOR_1'
     }, inplace=True)
 
     df['ENTRADA'] = pd.to_datetime(df['ENTRADA'], errors='coerce')
@@ -72,15 +73,15 @@ df_filtrado = df_filtrado[
     (df_filtrado['ENTRADA'] <= pd.to_datetime(data_fim))
 ]
 
-# INDICADOR 1
+# Indicador 1: Usando a coluna Q ("Numerador 1")
 if indicador_selecionado == "1ª Visita em até 30 dias":
     df_validos = df_filtrado.copy()
 
-    if 'Numerador 1' in df_validos.columns:
-        df_validos['Numerador 1'] = pd.to_numeric(df_validos['Numerador 1'], errors='coerce').fillna(0).astype(int)
-        df_numerador = df_validos[df_validos['Numerador 1'] == 1]
+    if 'NUMERADOR_1' in df_validos.columns:
+        df_validos['NUMERADOR_1'] = pd.to_numeric(df_validos['NUMERADOR_1'], errors='coerce').fillna(0).astype(int)
+        df_numerador = df_validos[df_validos['NUMERADOR_1'] == 1]
     else:
-        st.warning("A coluna 'Numerador 1' não foi encontrada.")
+        st.warning("A coluna 'Numerador 1' (coluna Q) não foi encontrada.")
         df_numerador = pd.DataFrame([])
 
     numerador = len(df_numerador)
@@ -94,7 +95,7 @@ if indicador_selecionado == "1ª Visita em até 30 dias":
     - 📊 **Denominador:** {denominador}
     """)
 
-# INDICADOR 2
+# Indicador 2
 elif indicador_selecionado == "Processo finalizado em até 90 dias":
     df_90 = df_filtrado[
         ~df_filtrado['SITUAÇÃO'].isin(["EM INSPEÇÃO", "AGUARDANDO 1ª INSPEÇÃO", "PENDÊNCIA DOCUMENTAL"])
@@ -114,7 +115,7 @@ elif indicador_selecionado == "Processo finalizado em até 90 dias":
     - 📊 **Denominador:** {denominador_90}
     """)
 
-# GRÁFICOS
+# Gráficos
 st.subheader("Visualização dos Dados")
 
 if not df_filtrado.empty:
@@ -124,7 +125,7 @@ if not df_filtrado.empty:
     g2 = px.histogram(df_filtrado, x='CLASSIFICAÇÃO', title='Distribuição por Classificação')
     st.plotly_chart(g2, use_container_width=True)
 
-# TABELA FINAL COM DATAS FORMATADAS
+# Tabela com datas formatadas
 st.subheader("Tabela de Dados Filtrados")
 df_visual = df_filtrado.copy()
 for col in ['ENTRADA', '1ª INSPEÇÃO', 'DATA_CONCLUSAO', 'PREVISÃO CONCLUSÃO', 'PREVISAO_1A_INSP']:
