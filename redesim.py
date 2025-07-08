@@ -3,29 +3,29 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime
 
-# ========== LOGIN ==========
-def autenticar():
-    if "autenticado" not in st.session_state:
-        st.session_state.autenticado = False
+# ---🔐 LOGIN SIMPLES ---
+def login():
+    st.title("🔐 Painel da Vigilância Sanitária de Ipojuca")
+    st.subheader("Acesso Restrito")
 
-    if not st.session_state.autenticado:
-        with st.form("login_form"):
-            st.subheader("🔐 Login - Painel VISA Ipojuca")
-            usuario = st.text_input("Usuário")
-            senha = st.text_input("Senha", type="password")
-            submit = st.form_submit_button("Entrar")
+    with st.form("login_form"):
+        username = st.text_input("Usuário")
+        password = st.text_input("Senha", type="password")
+        submit = st.form_submit_button("Entrar")
 
-            if submit:
-                if usuario == "admin" and senha == "Ipojuca@2025*":
-                    st.session_state.autenticado = True
-                    st.success("✅ Login realizado com sucesso!")
-                    st.rerun()
-                else:
-                    st.error("❌ Usuário ou senha incorretos.")
-        return False
-    return True
+    if submit:
+        if username == "admin" and password == "Ipojuca@2025*":
+            st.session_state["autenticado"] = True
+            st.success("✅ Login realizado com sucesso!")
+            st.rerun()
+        else:
+            st.error("❌ Usuário ou senha incorretos.")
 
-if not autenticar():
+if "autenticado" not in st.session_state:
+    st.session_state["autenticado"] = False
+
+if not st.session_state["autenticado"]:
+    login()
     st.stop()
 
 # ========== PAINEL ==========
