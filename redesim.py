@@ -5,7 +5,7 @@ from datetime import datetime
 
 # ---🔐 LOGIN SIMPLES ---
 def login():
-    st.title("🔐 Painel da Vigilância Sanitária de Ipojuca")
+    st.title("🔐 Painel de Monitoramento de Indicadores da Vigilância Sanitária de Ipojuca")
     st.subheader("Acesso Restrito")
 
     with st.form("login_form"):
