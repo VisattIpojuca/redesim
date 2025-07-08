@@ -3,6 +3,32 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime
 
+# ========== LOGIN ==========
+def autenticar():
+    if "autenticado" not in st.session_state:
+        st.session_state.autenticado = False
+
+    if not st.session_state.autenticado:
+        with st.form("login_form"):
+            st.subheader("🔐 Login - Painel VISA Ipojuca")
+            usuario = st.text_input("Usuário")
+            senha = st.text_input("Senha", type="password")
+            submit = st.form_submit_button("Entrar")
+
+            if submit:
+                if usuario == "admin" and senha == "Ipojuca@2025*":
+                    st.session_state.autenticado = True
+                    st.success("✅ Login realizado com sucesso!")
+                    st.rerun()
+                else:
+                    st.error("❌ Usuário ou senha incorretos.")
+        return False
+    return True
+
+if not autenticar():
+    st.stop()
+
+# ========== PAINEL ==========
 st.set_page_config(page_title="Painel VISA Ipojuca", layout="wide")
 st.title("Painel de Inspeções - Vigilância Sanitária de Ipojuca")
 
@@ -67,13 +93,12 @@ if filtro_territorio:
 if filtro_situacao:
     df_filtrado = df_filtrado[df_filtrado['SITUAÇÃO'].isin(filtro_situacao)]
 
-# Período
 df_filtrado = df_filtrado[
     (df_filtrado['ENTRADA'] >= pd.to_datetime(data_inicio)) &
     (df_filtrado['ENTRADA'] <= pd.to_datetime(data_fim))
 ]
 
-# Indicador 1: Usando a coluna Q ("Numerador 1")
+# Indicador 1: baseado na coluna Q ("NUMERADOR_1")
 if indicador_selecionado == "1ª Visita em até 30 dias":
     df_validos = df_filtrado.copy()
 
@@ -95,15 +120,16 @@ if indicador_selecionado == "1ª Visita em até 30 dias":
     - 📊 **Denominador:** {denominador}
     """)
 
-# Indicador 2
 elif indicador_selecionado == "Processo finalizado em até 90 dias":
     df_90 = df_filtrado[
         ~df_filtrado['SITUAÇÃO'].isin(["EM INSPEÇÃO", "AGUARDANDO 1ª INSPEÇÃO", "PENDÊNCIA DOCUMENTAL"])
     ]
+
     filtro_valido_90 = (
         df_90['DATA_CONCLUSAO'].notna() &
         (df_90['DATA_CONCLUSAO'] <= df_90['PREVISÃO CONCLUSÃO'])
     )
+
     numerador_90 = filtro_valido_90.sum()
     denominador_90 = len(df_filtrado)
     percentual_90 = (numerador_90 / denominador_90 * 100) if denominador_90 > 0 else 0
